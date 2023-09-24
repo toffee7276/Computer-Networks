@@ -1,0 +1,60 @@
+import java.net.*;
+import java.util.Arrays;
+import java.util.List;
+import java.io.*;
+
+public class Server 
+{
+    public static void main(String[] args) throws IOException, InterruptedException 
+	{
+        if (args.length != 3) 
+		{
+            System.err.println("Usage: java Server <port number> <probability of error> <channel delay (ms)>");
+            System.exit(1);
+        }
+        int port_num = Integer.parseInt(args[0]);
+        double prob_of_error = Double.parseDouble(args[1]);
+        long chnl_Delay = Long.parseLong(args[2]);
+        boolean listen = true;
+        int msg_num = 0;
+        System.out.println("Server started ....");
+        try (DatagramSocket socket = new DatagramSocket(port_num))
+		{
+            while (listen)
+			{
+                byte[] buffer = new byte[512];
+                DatagramPacket pckt = new DatagramPacket(buffer, buffer.length);
+                System.out.println("Waiting for client ...");
+                // client's message
+                socket.receive(pckt);
+                // simulating channel delay
+                Thread.sleep(chnl_Delay);
+                // error simulation
+                double myChoice = Math.random();
+                String res_string;
+                if(myChoice < prob_of_error)
+				{
+                    System.out.println("Erroneous packet received ");
+                    res_string = "NACK";
+                } 
+				 else 
+				 {
+                    msg_num++;
+                    String feedback = new String(pckt.getData(), 0 , pckt.getLength());
+                    if(feedback.equalsIgnoreCase("end"))
+					{
+                        listen = false;
+                    }
+                    System.out.println("Received message number " + msg_num +  ":\n" + feedback );
+                    res_string = "ACK";
+                }
+                InetAddress addr = pckt.getAddress();
+                byte[] response = res_string.getBytes(); 
+                int port = pckt.getPort();
+                pckt = new DatagramPacket(response, response.length, addr, port);
+                socket.send(pckt);
+            }
+        }
+    }
+
+}
