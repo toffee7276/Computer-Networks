@@ -1,0 +1,76 @@
+import java.io.BufferedReader;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
+public class Client 
+{
+
+    public static void main(String[] args) throws IOException
+	{
+        if (args.length != 3) {
+            System.out.println("Usage: java Client <hostname> <port> <filepath>");
+            System.exit(1);
+        }
+        double send_delay = 0;
+        long Start_Time = System.currentTimeMillis();
+        try(DatagramSocket socket = new DatagramSocket())
+		{
+            InetAddress addr = InetAddress.getByName(args[0]);
+            int port = Integer.valueOf(args[1]);
+            try(BufferedReader in = new BufferedReader(new FileReader(args[2])))
+			{
+                String val;
+                while ((val = in.readLine())!=null)
+				{
+                    byte[] buffer = val.getBytes();
+                    DatagramPacket pckt = new DatagramPacket(buffer, buffer.length, addr, port);
+                    boolean retrnsmt;
+                    do 
+					{
+                        long time_bfr_send = System.currentTimeMillis();
+                        System.out.println("Trying to send below message in a packet: \n" + val);
+                        socket.send(pckt);
+                        // time required for pushing all bits of datagram into the channel
+                        send_delay += System.currentTimeMillis() - time_bfr_send;
+                        byte[] receive_buffer = new byte[256];
+                        // packet for receiving response from server
+                        DatagramPacket receive_pckt = new DatagramPacket(receive_buffer, receive_buffer.length);
+                        // waiting for the response from server
+                        socket.receive(receive_pckt);
+                        String feedback = new String(receive_pckt.getData(), 0 , receive_pckt.getLength());
+                        // checking the server response
+                        if(feedback.equals("NACK"))
+						{
+                            System.out.println("NACK received: retransmitting");
+                            retrnsmt = true;
+                        } 
+					    else if(feedback.equals("ACK"))
+						{
+                            System.out.println("ACK received: successfully transmitted ");
+                            retrnsmt = false;
+                        } 
+						else 
+						{
+                            System.err.println("Received message that cannot be identified :( " + feedback);
+                            return;
+                        }
+                    } while (retrnsmt);
+                    System.out.println("Transmission of current packet is completed...");
+                }
+                System.out.println("Closing Datagram socket ...");
+            } catch(FileNotFoundException ex)
+			  {
+                System.err.println("Couldn't open the file " + args[2] + ". Please Check the path");
+                return;
+              }
+            long total_delay = System.currentTimeMillis() - Start_Time;
+            double link_util = send_delay / total_delay;
+            System.out.println("Total sending delay is: " + send_delay + "ms");
+            System.out.println("Total delay is: " + total_delay + "ms");
+            System.out.println("Link utilization is: " + link_util);
+        }
+    }
+}
